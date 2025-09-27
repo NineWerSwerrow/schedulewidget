@@ -13,6 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.modifier.modifierLocalOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.unit.dp
@@ -98,6 +100,30 @@ fun WeekGridScreen() {
         }
 
         Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .shadow(8.dp, shape = RoundedCornerShape(size= 24.dp)))
+                {
+                    Column (modifier = Modifier.padding(12.dp)) {
+                        Text("Принудительно обновить виджет на: ", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row (horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {ScheduleWidget.updateAllWidgets(ctx, showTomorrow = false)},
+                                modifier = Modifier.weight(1f)
+                            ) {Text("Сегодня")}
+                            OutlinedButton(
+                                onClick = {ScheduleWidget.updateAllWidgets(ctx, showTomorrow = true)},
+                                modifier = Modifier.weight(1f)
+                            ) {Text("Завтра") }
+                        }
+                    }
+                }
 
         // карточка выбора времени
         Card(
