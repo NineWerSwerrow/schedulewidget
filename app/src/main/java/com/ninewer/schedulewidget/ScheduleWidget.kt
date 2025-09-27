@@ -151,6 +151,7 @@ fun getDayIndex(offset: Int = 0): Int {
         Calendar.THURSDAY -> 3
         Calendar.FRIDAY -> 4
         Calendar.SATURDAY -> 5
+        Calendar.SUNDAY -> 0
         else -> 0
     }
 }

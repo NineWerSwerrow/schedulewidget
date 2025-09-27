@@ -55,14 +55,7 @@ fun WeekGridScreen() {
     var uris by remember { mutableStateOf(ImageStore.loadAll(ctx)) }
 
     var pickIndex by remember { mutableStateOf(-1) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        uri?.let {
-            ctx.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            ImageStore.saveUri(ctx, pickIndex, it)
-            uris = ImageStore.loadAll(ctx)
-            ScheduleWidget.updateAllWidgets(ctx, showTomorrow = false)
-        }
-    }
+
 
     val todayIndex = remember { getTodayIndexForWeekdays() }
 
@@ -72,6 +65,15 @@ fun WeekGridScreen() {
     }
     var selectedMinute by remember {
         mutableStateOf(prefs.getInt("updateMinute", ScheduleWidget.updateMinute))
+    }
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri?.let {
+            ctx.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            ImageStore.saveUri(ctx, pickIndex, it)
+            uris = ImageStore.loadAll(ctx)
+            ScheduleWidget.updateAllWidgets(ctx, showTomorrow = hasAlarmTimePassed(selectedHour, selectedMinute))
+        }
     }
 
     Column(
@@ -128,7 +130,7 @@ fun WeekGridScreen() {
                             ScheduleWidget.updateHour = 0
                             ScheduleWidget.updateMinute = 0
                             ScheduleWidget.scheduleNextUpdate(ctx)
-                            ScheduleWidget.updateAllWidgets(ctx, showTomorrow = false)
+                            ScheduleWidget.updateAllWidgets(ctx, showTomorrow = hasAlarmTimePassed(selectedHour, selectedMinute))
 
                             prefs.edit()
                                 .putInt("updateHour", 0)
@@ -170,7 +172,7 @@ fun WeekGridScreen() {
                                         selectedHour = newVal
                                         ScheduleWidget.updateHour = newVal
                                         ScheduleWidget.scheduleNextUpdate(ctx)
-                                        ScheduleWidget.updateAllWidgets(ctx, showTomorrow = false)
+                                        ScheduleWidget.updateAllWidgets(ctx, showTomorrow = hasAlarmTimePassed(selectedHour, selectedMinute))
                                         prefs.edit()
                                             .putInt("updateHour", newVal)
                                             .apply()
@@ -191,7 +193,7 @@ fun WeekGridScreen() {
                                         selectedMinute = newVal
                                         ScheduleWidget.updateMinute = newVal
                                         ScheduleWidget.scheduleNextUpdate(ctx)
-                                        ScheduleWidget.updateAllWidgets(ctx, showTomorrow = false)
+                                        ScheduleWidget.updateAllWidgets(ctx, showTomorrow = hasAlarmTimePassed(selectedHour, selectedMinute))
                                         prefs.edit()
                                             .putInt("updateMinute", newVal)
                                             .apply()
@@ -318,6 +320,18 @@ fun DayTile(
     }
 }
 
+fun hasAlarmTimePassed(hour: Int, minute: Int): Boolean {
+    val now = Calendar.getInstance()
+    val target = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, minute)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    return now.after(target)
+}
+
+
 fun getTodayIndexForWeekdays(): Int? {
     val c = Calendar.getInstance()
     return when (c.get(Calendar.DAY_OF_WEEK)) {
@@ -327,6 +341,7 @@ fun getTodayIndexForWeekdays(): Int? {
         Calendar.THURSDAY -> 3
         Calendar.FRIDAY -> 4
         Calendar.SATURDAY -> 5
+        Calendar.SUNDAY -> 0
         else -> null
     }
 }
