@@ -104,6 +104,7 @@ fun WeekGridScreen() {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp)
+                .shadow(8.dp, shape = RoundedCornerShape(size= 24.dp))
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text("Время перехода на следующий день", style = MaterialTheme.typography.titleMedium)
