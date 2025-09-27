@@ -46,4 +46,5 @@
                 android:resource="@xml/schedule_widget_info" />
         </receiver>
     </application>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 </manifest>

@@ -1,18 +1,20 @@
 package com.ninewer.schedulewidget
 
 import android.R.color.white
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.NumberPicker
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,12 +26,12 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import java.util.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
 import com.ninewer.schedulewidget.ui.theme.ScheduleWidgetTheme
+import java.util.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,6 +50,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun WeekGridScreen() {
     val ctx = LocalContext.current
+    val prefs = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE)
+
     var uris by remember { mutableStateOf(ImageStore.loadAll(ctx)) }
 
     var pickIndex by remember { mutableStateOf(-1) }
@@ -56,11 +60,19 @@ fun WeekGridScreen() {
             ctx.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             ImageStore.saveUri(ctx, pickIndex, it)
             uris = ImageStore.loadAll(ctx)
-            ScheduleWidget.updateAllWidgets(ctx)
+            ScheduleWidget.updateAllWidgets(ctx, showTomorrow = false)
         }
     }
 
     val todayIndex = remember { getTodayIndexForWeekdays() }
+
+    var showTimePicker by remember { mutableStateOf(false) }
+    var selectedHour by remember {
+        mutableStateOf(prefs.getInt("updateHour", ScheduleWidget.updateHour))
+    }
+    var selectedMinute by remember {
+        mutableStateOf(prefs.getInt("updateMinute", ScheduleWidget.updateMinute))
+    }
 
     Column(
         modifier = Modifier
@@ -74,7 +86,6 @@ fun WeekGridScreen() {
             modifier = Modifier
                 .fillMaxWidth()
                 .shadow(8.dp, shape = RoundedCornerShape(24.dp))
-                //.padding(bottom = 8.dp) <- makes shadow ugly
         ) {
             Text(
                 "Виджет Расписания",
@@ -84,17 +95,129 @@ fun WeekGridScreen() {
             )
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // карточка выбора времени
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Время перехода на следующий день", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = String.format("%02d:%02d", selectedHour, selectedMinute),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { showTimePicker = true },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Выбрать время")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            selectedHour = 0
+                            selectedMinute = 0
+                            ScheduleWidget.updateHour = 0
+                            ScheduleWidget.updateMinute = 0
+                            ScheduleWidget.scheduleNextUpdate(ctx)
+                            ScheduleWidget.updateAllWidgets(ctx, showTomorrow = false)
+
+                            prefs.edit()
+                                .putInt("updateHour", 0)
+                                .putInt("updateMinute", 0)
+                                .apply()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Сбросить")
+                    }
+                }
+            }
+        }
+
+        // диалог выбора времени
+        if (showTimePicker) {
+            val isDark = isSystemInDarkTheme()
+            val textColor = if (isDark) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+            AlertDialog(
+                onDismissRequest = { showTimePicker = false },
+                confirmButton = {
+                    TextButton(onClick = { showTimePicker = false }) {
+                        Text("OK")
+                    }
+                },
+                text = {
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        AndroidView(
+                            factory = { context ->
+                                NumberPicker(context).apply {
+                                    minValue = 0
+                                    maxValue = 23
+                                    value = selectedHour
+                                    setTextColor(textColor)
+                                    setOnValueChangedListener { _, _, newVal ->
+                                        selectedHour = newVal
+                                        ScheduleWidget.updateHour = newVal
+                                        ScheduleWidget.scheduleNextUpdate(ctx)
+                                        ScheduleWidget.updateAllWidgets(ctx, showTomorrow = false)
+                                        prefs.edit()
+                                            .putInt("updateHour", newVal)
+                                            .apply()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        AndroidView(
+                            factory = { context ->
+                                NumberPicker(context).apply {
+                                    minValue = 0
+                                    maxValue = 59
+                                    value = selectedMinute
+                                    setTextColor(textColor)
+                                    setOnValueChangedListener { _, _, newVal ->
+                                        selectedMinute = newVal
+                                        ScheduleWidget.updateMinute = newVal
+                                        ScheduleWidget.scheduleNextUpdate(ctx)
+                                        ScheduleWidget.updateAllWidgets(ctx, showTomorrow = false)
+                                        prefs.edit()
+                                            .putInt("updateMinute", newVal)
+                                            .apply()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         Text(
             "Нажмите плитку, чтобы открыть фото. Долгое нажатие — выбрать фото",
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // строки вручную
+        // список плиток
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.weight(1f)
         ) {
-            val rows = WEEK_DAYS.chunked(2) // каждая строка = 2 элемента
+            val rows = WEEK_DAYS.chunked(2)
             items(rows.size) { rowIndex ->
                 val row = rows[rowIndex]
                 Row(
@@ -104,9 +227,7 @@ fun WeekGridScreen() {
                     row.forEachIndexed { i, dayName ->
                         val index = rowIndex * 2 + i
                         val isToday = index == todayIndex
-                        Box(
-                            modifier = Modifier.weight(if (isToday) 2f else 1f)
-                        ) {
+                        Box(modifier = Modifier.weight(if (isToday) 2f else 1f)) {
                             DayTile(
                                 dayName = dayName,
                                 uri = uris.getOrNull(index),
@@ -125,7 +246,6 @@ fun WeekGridScreen() {
                             )
                         }
                     }
-                    // заполнение пустым местом нечётное кол-во дней <- useless + ugly but we'll not see it
                     if (row.size == 1) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
@@ -135,7 +255,6 @@ fun WeekGridScreen() {
     }
 }
 
-// \/ just composing
 @Composable
 fun DayTile(
     dayName: String,
@@ -197,6 +316,7 @@ fun DayTile(
         }
     }
 }
+
 fun getTodayIndexForWeekdays(): Int? {
     val c = Calendar.getInstance()
     return when (c.get(Calendar.DAY_OF_WEEK)) {
@@ -206,7 +326,6 @@ fun getTodayIndexForWeekdays(): Int? {
         Calendar.THURSDAY -> 3
         Calendar.FRIDAY -> 4
         Calendar.SATURDAY -> 5
-        Calendar.SUNDAY -> 6
         else -> null
     }
 }
