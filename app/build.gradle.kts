@@ -12,7 +12,7 @@ android {
         applicationId = "com.ninewer.schedulewidget"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
+        versionCode = 2
         versionName = "2.0"
 
         vectorDrawables {
