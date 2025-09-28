@@ -298,7 +298,7 @@ fun DayTile(
         shape = RoundedCornerShape(cornerRadius),
         modifier = Modifier
             .fillMaxWidth()
-            .height(150.dp)
+            .height(120.dp)
             .shadow(
                 elevation = if (isToday) 16.dp else 8.dp,
                 shape = RoundedCornerShape(cornerRadius),
